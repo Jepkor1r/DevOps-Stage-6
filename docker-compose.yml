@@ -1,0 +1,54 @@
+version: "3.8"
+services:
+  traefik:
+    image: traefik:v2.10
+    command:
+      - --api.insecure=false
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      - --certificatesresolvers.le.acme.email=${LE_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/traefik
+      - ./letsencrypt:/letsencrypt
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=le"
+    depends_on: [traefik]
+
+  auth:
+    build: ./auth
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=Host(`${DOMAIN}`) && PathPrefix(`/api/auth`)"
+      - "traefik.http.routers.auth.entrypoints=websecure"
+      - "traefik.http.services.auth.loadbalancer.server.port=8080"
+
+  todos:
+    build: ./todos
+    labels:
+      - "traefik.http.routers.todos.rule=Host(`${DOMAIN}`) && PathPrefix(`/api/todos`)"
+      - "traefik.http.routers.todos.entrypoints=websecure"
+      - "traefik.http.services.todos.loadbalancer.server.port=3000"
+
+  users:
+    build: ./users
+    labels:
+      - "traefik.http.routers.users.rule=Host(`${DOMAIN}`) && PathPrefix(`/api/users`)"
+      - "traefik.http.services.users.loadbalancer.server.port=8081"
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
