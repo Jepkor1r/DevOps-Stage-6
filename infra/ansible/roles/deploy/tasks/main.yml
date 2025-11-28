@@ -1,0 +1,26 @@
+---
+- name: Ensure application directory exists
+  file:
+    path: /opt/devops-app
+    state: directory
+    mode: "0755"
+
+- name: Clone application repository
+  git:
+    repo: 'https://github.com/<your-github-username>/<repo>.git'
+    dest: /opt/devops-app
+    version: main
+    force: yes
+
+- name: Copy docker-compose.yml
+  copy:
+    src: /opt/devops-app/docker-compose.yml
+    dest: /opt/devops-app/docker-compose.yml
+    owner: root
+    group: root
+    mode: 0644
+
+- name: Start application using Docker Compose
+  command: docker compose up -d
+  args:
+    chdir: /opt/devops-app
